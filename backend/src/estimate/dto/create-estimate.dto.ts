@@ -59,43 +59,44 @@ class CeilingDimInputDto {
   length?: number; // длина потолка, м
 }
 
+// 🆕 БЛОК 0b: Полки (для расчёта освещения полков)
+class ShelfInputDto {
+  @IsOptional() @IsNumber() @Min(0)
+  width?: number;   // ширина полка, м
+
+  @IsOptional() @IsNumber() @Min(0)
+  length?: number;  // длина полка, м
+}
+
 // БЛОК 2: Финиш (вагонка) — параметры одной поверхности
 class FinishSurfaceInputDto {
-  // 'wall' | 'ceiling'
   @IsOptional() @IsString()
   surface?: string;
 
-  // необязательное имя ("Стена А", "Потолок")
   @IsOptional() @IsString()
   name?: string;
 
-  // габариты поверхности (если не заданы — берутся из зоны)
   @IsOptional() @IsNumber() @Min(0)
-  width?: number;   // ширина поверхности, м
+  width?: number;
 
   @IsOptional() @IsNumber() @Min(0)
-  height?: number;  // высота поверхности, м (для потолка = длина)
+  height?: number;
 
-  // номенклатура вагонки
   @IsOptional() @IsString()
   nomenclatureId?: string;
 
-  // 'horizontal' | 'vertical'
   @IsOptional() @IsString()
   orientation?: string;
 
-  // размеры доски (мм и м)
   @IsOptional() @IsNumber() @Min(0)
-  boardWidth?: number;   // рабочая ширина доски, мм
+  boardWidth?: number;
 
   @IsOptional() @IsNumber() @Min(0)
-  boardLength?: number;  // длина доски, м (напр. 3 или 6)
+  boardLength?: number;
 
-  // work type установки вагонки (опционально)
   @IsOptional() @IsString()
   workTypeId?: string;
 
-  // площадь вычесть (проёмы) — опционально
   @IsOptional() @IsNumber() @Min(0)
   deductArea?: number;
 }
@@ -124,59 +125,51 @@ class WoodenItemInputDto {
   @IsOptional() @IsString()
   workTypeId?: string;
 
-  // размеры (для расчёта площади/погонажа)
   @IsOptional() @IsNumber() @Min(0)
   length?: number;
 
   @IsOptional() @IsNumber() @Min(0)
   width?: number;
 
-  // кол-во штук
   @IsOptional() @IsNumber() @Min(0)
   quantity?: number;
 
-  // формула кол-ва материала (опционально, иначе length*width*quantity)
   @IsOptional() @IsString()
   formula?: string;
 }
 
 // БЛОК 4: Проёмы (дверь/окно) + откосы
 class OpeningInputDto {
-  // 'door' | 'window'
   @IsOptional() @IsString()
   kind?: string;
 
   @IsOptional() @IsString()
   name?: string;
 
-  // номенклатура изделия (сама дверь/окно)
   @IsOptional() @IsString()
   nomenclatureId?: string;
 
-  // work type установки
   @IsOptional() @IsString()
   workTypeId?: string;
 
   @IsOptional() @IsNumber() @Min(0)
-  width?: number;   // м
+  width?: number;
 
   @IsOptional() @IsNumber() @Min(0)
-  height?: number;  // м
+  height?: number;
 
   @IsOptional() @IsNumber() @Min(0)
   quantity?: number;
 
-  // откосы
   @IsOptional() @IsBoolean()
   hasSlopes?: boolean;
 
   @IsOptional() @IsNumber() @Min(0)
-  slopeDepth?: number;   // глубина откоса, м
+  slopeDepth?: number;
 
   @IsOptional() @IsString()
   slopeNomenclatureId?: string;
 
-  // наличники (погонаж по периметру)
   @IsOptional() @IsBoolean()
   hasCasing?: boolean;
 
@@ -189,15 +182,14 @@ class LightingSegmentInputDto {
   @IsOptional() @IsString()
   name?: string;
 
-  // погонаж ленты, м
   @IsOptional() @IsNumber() @Min(0)
   length?: number;
 
   @IsOptional() @IsString()
-  nomenclatureId?: string;   // лента
+  nomenclatureId?: string;
 
   @IsOptional() @IsString()
-  cableNomenclatureId?: string; // кабель
+  cableNomenclatureId?: string;
 
   @IsOptional() @IsString()
   workTypeId?: string;
@@ -220,7 +212,7 @@ class EquipmentInputDto {
   nomenclatureId?: string;
 
   @IsOptional() @IsString()
-  workTypeId?: string;   // монтаж
+  workTypeId?: string;
 
   @IsOptional() @IsNumber() @Min(0)
   quantity?: number;
@@ -242,18 +234,25 @@ class SaunaZoneInputDto {
   @IsOptional() @IsNumber() @Min(0)
   area?: number;
 
-  // БЛОК 0: Стены А/Б/В/Г (если заданы — периметр = сумма их длин)
+  // БЛОК 0: Стены А/Б/В/Г
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => WallDimInputDto)
   walls?: WallDimInputDto[];
 
-  // Потолок (отдельные размеры; если не заданы — берётся площадь зоны)
+  // Потолок
   @IsOptional()
   @ValidateNested()
   @Type(() => CeilingDimInputDto)
   ceiling?: CeilingDimInputDto;
+
+  // 🆕 БЛОК 0b: Полки (1..4) — для освещения полков
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ShelfInputDto)
+  shelves?: ShelfInputDto[];
 
   // БЛОК 1: Термос — этапы (WorkStage), snapshot
   @IsOptional()
