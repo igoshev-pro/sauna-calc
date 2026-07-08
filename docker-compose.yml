@@ -1,0 +1,69 @@
+# version: '3.8'
+# services:
+#   mongodb:
+#     image: mongo:7
+#     container_name: sauna_mongo
+#     restart: always
+#     ports:
+#       - '27017:27017'
+#     environment:
+#       MONGO_INITDB_ROOT_USERNAME: admin
+#       MONGO_INITDB_ROOT_PASSWORD: secret123
+#       MONGO_INITDB_DATABASE: sauna_calc
+#     volumes:
+#       - mongo_data:/data/db
+
+# volumes:
+#   mongo_data:
+
+services:
+  mongo:
+    image: mongo:7
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - saunanet
+    # порт наружу НЕ пробрасываем — доступ только из backend
+
+  backend:
+    build:
+      context: ./backend
+    restart: always
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+    networks:
+      - saunanet
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - saunanet
+
+volumes:
+  mongo_data:
+
+networks:
+  saunanet:
+    driver: bridge
