@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-const PdfPrinter = require('pdfmake');
+const PdfPrinterModule = require('pdfmake');
+const PdfPrinter = PdfPrinterModule.default || PdfPrinterModule;
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { Estimate, EstimateDocument } from './schemas/estimate.schema';
 import { ProjectsService } from '../projects/projects.service';
