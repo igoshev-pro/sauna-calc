@@ -93,4 +93,10 @@ export class ProjectsService {
     );
     return { success: true };
   }
+
+  async incrementEstimatesCount(projectId: string, delta: number) {
+    await this.projectModel.findByIdAndUpdate(projectId, {
+      $inc: { estimatesCount: delta },
+    });
+  }
 }

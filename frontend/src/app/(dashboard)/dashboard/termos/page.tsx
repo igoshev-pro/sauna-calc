@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Ruler, Layers, Wind, Paintbrush, Hammer, FileText,
   ChevronLeft, ChevronRight, Calculator, Lock, RotateCcw,
-  ChevronDown, Package, Wrench, Info, Lightbulb,
+  ChevronDown, Package, Wrench, Info, Lightbulb, Save, Check,
 } from 'lucide-react';
 import { Header } from '@/components/ui/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -31,17 +32,34 @@ const fmt = (n: number) =>
   (n ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 
 export default function TermosPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get('projectId');
+  const estimateId = searchParams.get('estimateId');
+
   const {
     step, measurements, allStages, selectedStageIds,
     stagesLoading, calcLoading, result, error,
+    estimateName, saveLoading, savedOk,
     setStep, setHeight, setWall, setCeiling, setShelf,
     toggleStage, selectVentilation, stagesByCategory,
     fetchStages, calculate, reset,
+    setProjectId, loadEstimate, save, setEstimateName,
   } = useTermosWizardStore();
 
+  // инициализация: сначала грузим этапы, потом (если есть) смету/проект
   useEffect(() => {
-    if (allStages.length === 0) fetchStages();
-  }, []);
+    const init = async () => {
+      if (allStages.length === 0) await fetchStages();
+      if (estimateId) {
+        await loadEstimate(estimateId);
+      } else if (projectId) {
+        await setProjectId(projectId);
+      }
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, estimateId]);
 
   const goStep = (id: number) => {
     const target = STEPS.find((s) => s.id === id);
@@ -87,8 +105,8 @@ export default function TermosPage() {
                       'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
                       active ? 'bg-amber-600 text-white'
                         : done ? 'bg-amber-100 text-amber-700'
-                        : s.locked ? 'bg-gray-50 text-gray-300'
-                        : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200',
+                          : s.locked ? 'bg-gray-50 text-gray-300'
+                            : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200',
                     ].join(' ')}
                   >
                     {s.locked ? <Lock className="w-4 h-4" /> : <Icon className="w-5 h-5" />}
@@ -170,7 +188,7 @@ export default function TermosPage() {
                 </div>
               </div>
 
-              {/* 🆕 Полки (для освещения полков) */}
+              {/* Полки (для освещения полков) */}
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-1">Полки, м</p>
                 <p className="text-xs text-gray-400 mb-2">
@@ -355,6 +373,15 @@ export default function TermosPage() {
               result={result}
               loading={calcLoading}
               onCalc={calculate}
+              estimateName={estimateName}
+              onNameChange={setEstimateName}
+              onSave={save}
+              saveLoading={saveLoading}
+              savedOk={savedOk}
+              projectId={projectId}
+              onBackToProject={() =>
+                projectId && router.push(`/dashboard/projects/${projectId}`)
+              }
             />
           )}
         </div>
@@ -390,10 +417,19 @@ type ResultTab = 'client' | 'purchase';
 
 function ResultView({
   result, loading, onCalc,
+  estimateName, onNameChange, onSave, saveLoading, savedOk,
+  projectId, onBackToProject,
 }: {
   result: ReturnType<typeof useTermosWizardStore.getState>['result'];
   loading: boolean;
   onCalc: () => void;
+  estimateName: string;
+  onNameChange: (v: string) => void;
+  onSave: () => Promise<boolean>;
+  saveLoading: boolean;
+  savedOk: boolean;
+  projectId: string | null;
+  onBackToProject: () => void;
 }) {
   const [tab, setTab] = useState<ResultTab>('client');
 
@@ -445,6 +481,27 @@ function ResultView({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* ── Панель сохранения ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <div className="flex-1">
+          <Input
+            label="Название сметы"
+            value={estimateName}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Расчёт парной"
+          />
+        </div>
+        <Button onClick={onSave} loading={saveLoading}>
+          {savedOk ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {savedOk ? 'Сохранено' : 'Сохранить смету'}
+        </Button>
+        {projectId && savedOk && (
+          <Button variant="secondary" onClick={onBackToProject}>
+            К проекту
+          </Button>
+        )}
+      </div>
+
       {/* Итоги */}
       <div className="grid grid-cols-3 gap-4">
         <SummaryCard label="Работы" value={result.laborTotal} icon={Wrench} />
@@ -452,7 +509,7 @@ function ResultView({
         <SummaryCard label="Итого клиенту" value={result.grandTotal} accent icon={FileText} />
       </div>
 
-            {/* Переключатель */}
+      {/* Переключатель */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         <TabBtn active={tab === 'client'} onClick={() => setTab('client')}>
           <FileText className="w-4 h-4" /> Для клиента

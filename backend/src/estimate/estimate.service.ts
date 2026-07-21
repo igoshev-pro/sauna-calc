@@ -8,6 +8,7 @@ import { WorkStage, WorkStageDocument } from '../work-stages/schemas/work-stage.
 import { MarkupSettings, MarkupSettingsDocument } from '../markup/schemas/markup-settings.schema';
 import { CreateEstimateDto } from './dto/create-estimate.dto';
 import { evalFormula } from './formula-engine';
+import { ProjectsService } from '../projects/projects.service';
 
 
 @Injectable()
@@ -18,6 +19,7 @@ export class EstimateService {
         @InjectModel(NomenclatureItem.name) private nomModel: Model<NomenclatureDocument>,
         @InjectModel(WorkStage.name) private workStageModel: Model<WorkStageDocument>,
         @InjectModel(MarkupSettings.name) private markupModel: Model<MarkupSettingsDocument>,
+        private projectsService: ProjectsService,
     ) { }
 
 
@@ -459,7 +461,11 @@ export class EstimateService {
             createdBy: userId ? new Types.ObjectId(userId) : undefined,
             ...computed,
         });
-        return doc.save();
+        const saved = await doc.save();
+        if (dto.projectId) {
+            await this.projectsService.incrementEstimatesCount(dto.projectId, 1);
+        }
+        return saved;
     }
 
 
@@ -503,6 +509,12 @@ export class EstimateService {
     async remove(id: string) {
         const doc = await this.estimateModel.findByIdAndDelete(id);
         if (!doc) throw new NotFoundException('Смета не найдена');
+        if (doc.projectId) {
+            await this.projectsService.incrementEstimatesCount(
+                doc.projectId.toString(),
+                -1,
+            );
+        }
         return { deleted: true };
     }
 }

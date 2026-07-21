@@ -7,6 +7,7 @@ import { WorkStage, WorkStageSchema } from '../work-stages/schemas/work-stage.sc
 import { MarkupSettings, MarkupSettingsSchema } from '../markup/schemas/markup-settings.schema';
 import { EstimateService } from './estimate.service';
 import { EstimateController } from './estimate.controller';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EstimateController } from './estimate.controller';
       { name: WorkStage.name, schema: WorkStageSchema },
       { name: MarkupSettings.name, schema: MarkupSettingsSchema },
     ]),
+    ProjectsModule,
   ],
   providers: [EstimateService],
   controllers: [EstimateController],

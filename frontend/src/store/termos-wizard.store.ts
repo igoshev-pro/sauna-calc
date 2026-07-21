@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { workStagesApi, estimatesApi } from '@/lib/api';
+import { workStagesApi, estimatesApi, projectsApi } from '@/lib/api';
 
 // ─── Локальные типы под РЕАЛЬНЫЙ ответ бэка ───
 
@@ -17,7 +17,7 @@ export interface Measurements {
   height: number;
   walls: WallInput[];
   ceiling: { width: number; length: number };
-  shelves: ShelfInput[];   // 🆕 4 полка (для освещения)
+  shelves: ShelfInput[];
 }
 
 export interface PreviewMaterial {
@@ -64,7 +64,6 @@ export interface StageOption {
   sortOrder: number;
 }
 
-// 🆕 категории этапов по префиксу в названии
 export type StageCategory = 'termos' | 'ventilation' | 'lighting' | 'other';
 
 const PREFIX: Record<Exclude<StageCategory, 'other'>, string> = {
@@ -80,7 +79,6 @@ export function detectCategory(name: string): StageCategory {
   return 'other';
 }
 
-// красивое имя без префикса
 export function cleanStageName(name: string): string {
   return (name ?? '')
     .replace(PREFIX.termos, '')
@@ -99,14 +97,27 @@ interface TermosWizardState {
   result: PreviewResult | null;
   error: string;
 
+  // ── сохранение к проекту ──
+  projectId: string | null;
+  clientId: string | null;
+  estimateId: string | null;
+  estimateName: string;
+  saveLoading: boolean;
+  savedOk: boolean;
+
   setStep: (step: number) => void;
   setHeight: (v: number) => void;
   setWall: (name: WallInput['name'], v: number) => void;
   setCeiling: (field: 'width' | 'length', v: number) => void;
-  setShelf: (index: number, field: 'width' | 'length', v: number) => void; // 🆕
+  setShelf: (index: number, field: 'width' | 'length', v: number) => void;
 
   toggleStage: (id: string) => void;
   selectVentilation: (id: string | null) => void;
+
+  setEstimateName: (v: string) => void;
+  setProjectId: (id: string | null) => void;
+  loadEstimate: (id: string) => Promise<void>;
+  save: () => Promise<boolean>;
 
   fetchStages: () => Promise<void>;
   calculate: () => Promise<void>;
@@ -124,7 +135,7 @@ const DEFAULT_MEASUREMENTS: Measurements = {
     { name: 'Г', length: 0 },
   ],
   ceiling: { width: 0, length: 0 },
-  shelves: [                       // 🆕 Полок 1..4
+  shelves: [
     { width: 0, length: 0 },
     { width: 0, length: 0 },
     { width: 0, length: 0 },
@@ -136,7 +147,27 @@ function extractError(e: unknown): string {
   const err = e as { response?: { data?: { message?: string | string[] } } };
   const msg = err?.response?.data?.message;
   if (Array.isArray(msg)) return msg.join(', ');
-  return msg || 'Ошибка расчёта. Проверьте данные.';
+  return msg || 'Ошибка. Проверьте данные.';
+}
+
+// сборка payload для preview/save
+function buildPayload(state: TermosWizardState) {
+  const { measurements, selectedStageIds, estimateName, projectId, clientId } = state;
+  return {
+    name: estimateName?.trim() || 'Расчёт парной',
+    projectId: projectId || undefined,
+    clientId: clientId || undefined,
+    saunaZones: [
+      {
+        name: 'Парная',
+        height: measurements.height,
+        walls: measurements.walls,
+        ceiling: measurements.ceiling,
+        shelves: measurements.shelves,
+        stageIds: selectedStageIds,
+      },
+    ],
+  };
 }
 
 export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
@@ -148,6 +179,13 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
   calcLoading: false,
   result: null,
   error: '',
+
+  projectId: null,
+  clientId: null,
+  estimateId: null,
+  estimateName: 'Расчёт парной',
+  saveLoading: false,
+  savedOk: false,
 
   setStep: (step) => set({ step }),
 
@@ -172,7 +210,6 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
       },
     })),
 
-  // 🆕 полки
   setShelf: (index, field, v) =>
     set((s) => ({
       measurements: {
@@ -190,7 +227,6 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
         : [...s.selectedStageIds, id],
     })),
 
-  // вентиляция — только ОДИН вариант
   selectVentilation: (id) =>
     set((s) => {
       const ventIds = new Set(
@@ -204,6 +240,90 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
       };
     }),
 
+  setEstimateName: (v) => set({ estimateName: v }),
+
+  setProjectId: async (id: string | null) => {
+    set({ projectId: id });
+    if (!id) {
+      set({ clientId: null });
+      return;
+    }
+    try {
+      const { data } = await projectsApi.getOne(id);
+      const cid = (data as any).clientId?._id ?? (data as any).clientId ?? null;
+      set({ clientId: typeof cid === 'string' ? cid : null });
+    } catch {
+      // молча — clientId необязателен
+    }
+  },
+
+  // загрузка существующей сметы для редактирования
+  loadEstimate: async (id: string) => {
+    set({ error: '' });
+    try {
+      const { data } = await estimatesApi.getOne(id);
+      const zone: any = data.saunaZones?.[0];
+
+      if (zone) {
+        const walls: WallInput[] = ['А', 'Б', 'В', 'Г'].map((n, i) => ({
+          name: n as WallInput['name'],
+          length: zone.walls?.[i]?.length ?? 0,
+        }));
+
+        set((s) => ({
+          measurements: {
+            height: zone.height ?? 2.4,
+            walls,
+            ceiling: {
+              width: zone.ceiling?.width ?? 0,
+              length: zone.ceiling?.length ?? 0,
+            },
+            shelves: s.measurements.shelves, // размеры полков в снапшоте не хранятся
+          },
+          selectedStageIds: (zone.stages ?? []).map((st: any) => String(st.stageId)),
+        }));
+      }
+
+      set({
+        estimateId: data._id,
+        estimateName: data.name ?? 'Расчёт парной',
+        projectId: (data as any).projectId
+          ? String((data as any).projectId)
+          : get().projectId,
+        clientId: (data as any).clientId
+          ? String((data as any).clientId)
+          : get().clientId,
+        result: {
+          saunaZones: data.saunaZones as any,
+          laborTotal: data.laborTotal,
+          materialsTotal: data.materialsTotal,
+          grandTotal: data.grandTotal,
+        },
+      });
+    } catch (e) {
+      set({ error: extractError(e) });
+    }
+  },
+
+    save: async () => {
+    const state = get();
+    set({ saveLoading: true, error: '', savedOk: false });
+    try {
+      const payload = buildPayload(state);
+      if (state.estimateId) {
+        await estimatesApi.update(state.estimateId, payload as never);
+      } else {
+        const { data } = await estimatesApi.create(payload as never);
+        set({ estimateId: data._id });
+      }
+      set({ saveLoading: false, savedOk: true });
+      return true;
+    } catch (e) {
+      set({ error: extractError(e), saveLoading: false, savedOk: false });
+      return false;
+    }
+  },
+
   fetchStages: async () => {
     set({ stagesLoading: true, error: '' });
     try {
@@ -216,15 +336,18 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
         }))
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
-      // по умолчанию выбираем все этапы ТЕРМОСА
-      const defaultSelected = stages
-        .filter((st) => detectCategory(st.name) === 'termos')
-        .map((st) => st._id);
+      set((s) => {
+        // если сметы ещё не грузили (нет выбранных этапов) — выбираем все Термос по умолчанию
+        const alreadySelected = s.selectedStageIds.length > 0;
+        const defaultSelected = stages
+          .filter((st) => detectCategory(st.name) === 'termos')
+          .map((st) => st._id);
 
-      set({
-        allStages: stages,
-        selectedStageIds: defaultSelected,
-        stagesLoading: false,
+        return {
+          allStages: stages,
+          selectedStageIds: alreadySelected ? s.selectedStageIds : defaultSelected,
+          stagesLoading: false,
+        };
       });
     } catch (e) {
       set({ error: extractError(e), stagesLoading: false });
@@ -232,22 +355,9 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
   },
 
   calculate: async () => {
-    const { measurements, selectedStageIds } = get();
     set({ calcLoading: true, error: '' });
     try {
-      const payload = {
-        name: 'Расчёт парной',
-        saunaZones: [
-          {
-            name: 'Парная',
-            height: measurements.height,
-            walls: measurements.walls,
-            ceiling: measurements.ceiling,
-            shelves: measurements.shelves,   // 🆕
-            stageIds: selectedStageIds,
-          },
-        ],
-      };
+      const payload = buildPayload(get());
       const { data } = await estimatesApi.preview(payload as never);
       set({ result: data as unknown as PreviewResult, calcLoading: false });
     } catch (e) {
@@ -264,6 +374,10 @@ export const useTermosWizardStore = create<TermosWizardState>((set, get) => ({
         .map((st) => st._id),
       result: null,
       error: '',
+      estimateId: null,
+      estimateName: 'Расчёт парной',
+      savedOk: false,
+      // projectId / clientId НЕ сбрасываем — остаёмся в контексте проекта
     })),
 
   stagesByCategory: (cat) =>
