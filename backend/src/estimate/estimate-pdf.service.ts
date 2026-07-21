@@ -23,18 +23,36 @@ function cleanName(name: string): string {
   return (name || '').replace(/^\[[^\]]+\]\s*/, '').trim();
 }
 
-// Встроенные шрифты pdfmake (Roboto с кириллицей)
-const vfsFonts = require('pdfmake/build/vfs_fonts.js');
-const vfs = vfsFonts.pdfMake ? vfsFonts.pdfMake.vfs : vfsFonts.vfs;
+// Шрифты Roboto (кириллица) — читаем ttf-файлы прямо из пакета pdfmake.
+// Устойчиво к разным версиям vfs_fonts.
+function resolveFonts() {
+  // Пытаемся найти vfs (в разных версиях структура отличается)
+  let vfs: Record<string, string> | undefined;
+  try {
+    const mod = require('pdfmake/build/vfs_fonts.js');
+    vfs = mod?.pdfMake?.vfs ?? mod?.vfs ?? mod?.default?.pdfMake?.vfs ?? mod?.default?.vfs;
+  } catch {
+    /* нет vfs — пойдём по файлам */
+  }
 
-const fonts = {
-  Roboto: {
-    normal: Buffer.from(vfs['Roboto-Regular.ttf'], 'base64'),
-    bold: Buffer.from(vfs['Roboto-Medium.ttf'], 'base64'),
-    italics: Buffer.from(vfs['Roboto-Italic.ttf'], 'base64'),
-    bolditalics: Buffer.from(vfs['Roboto-MediumItalic.ttf'], 'base64'),
-  },
-};
+  const pick = (name: string): Buffer => {
+    if (vfs && vfs[name]) return Buffer.from(vfs[name], 'base64');
+    // fallback: читаем ttf с диска из установленного пакета pdfmake
+    const p = require.resolve(`pdfmake/build/${name}`);
+    return require('fs').readFileSync(p);
+  };
+
+  return {
+    Roboto: {
+      normal: pick('Roboto-Regular.ttf'),
+      bold: pick('Roboto-Medium.ttf'),
+      italics: pick('Roboto-Italic.ttf'),
+      bolditalics: pick('Roboto-MediumItalic.ttf'),
+    },
+  };
+}
+
+const fonts = resolveFonts();
 
 @Injectable()
 export class EstimatePdfService {
