@@ -29,14 +29,22 @@ function cleanName(name: string): string {
 // В dev пути от dist/estimate, в prod — тоже от dist. Ищем в нескольких местах.
 function fontFile(name: string): Buffer {
   const candidates = [
-    path.join(process.cwd(), 'assets', 'fonts', name),
+    // dist/assets/fonts (после сборки nest с копированием assets)
+    path.join(__dirname, '..', 'assets', 'fonts', name),
+    // dist/estimate -> dist/assets... на всякий случай
     path.join(__dirname, '..', '..', 'assets', 'fonts', name),
-    path.join(__dirname, '..', '..', '..', 'assets', 'fonts', name),
+    // корень приложения
+    path.join(process.cwd(), 'dist', 'assets', 'fonts', name),
+    // dev-режим: src/assets/fonts
+    path.join(process.cwd(), 'src', 'assets', 'fonts', name),
+    path.join(process.cwd(), 'assets', 'fonts', name),
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) return fs.readFileSync(p);
   }
-  throw new Error(`Шрифт не найден: ${name}. Проверьте assets/fonts. Искали: ${candidates.join(' | ')}`);
+  throw new Error(
+    `Шрифт не найден: ${name}. Искали: ${candidates.join(' | ')}`,
+  );
 }
 
 const fonts = {
