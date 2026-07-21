@@ -49,28 +49,50 @@ function fontFile(name: string): Buffer {
     );
 }
 
+// pdfmake 0.3.x: шрифты нужно писать в virtualfs как файлы,
+// а в fontDescriptors указывать ИМЕНА файлов (строки), не Buffer.
+// (Buffer вызывает падение в resolveUrls -> toLowerCase(undefined)).
+const FONT_FILES = {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+};
+
+let fontsRegistered = false;
+function registerFonts() {
+    if (fontsRegistered) return;
+    for (const file of Object.values(FONT_FILES)) {
+        virtualfs.writeFileSync(file, fontFile(file));
+    }
+    fontsRegistered = true;
+}
+
 const fonts = {
     Roboto: {
-        normal: fontFile('Roboto-Regular.ttf'),
-        bold: fontFile('Roboto-Medium.ttf'),
-        italics: fontFile('Roboto-Italic.ttf'),
-        bolditalics: fontFile('Roboto-MediumItalic.ttf'),
+        normal: FONT_FILES.normal,
+        bold: FONT_FILES.bold,
+        italics: FONT_FILES.italics,
+        bolditalics: FONT_FILES.bolditalics,
     },
 };
 
 @Injectable()
 export class EstimatePdfService {
-    private printer = new (PdfPrinter as any)(
-        fonts,
-        virtualfs,
-        new URLResolver(virtualfs),
-    );
+    private printer: any;
 
     constructor(
         @InjectModel(Estimate.name)
         private estimateModel: Model<EstimateDocument>,
         private projectsService: ProjectsService,
-    ) { }
+    ) {
+        registerFonts();
+        this.printer = new (PdfPrinter as any)(
+            fonts,
+            virtualfs,
+            new URLResolver(virtualfs),
+        );
+    }
 
     async generate(id: string): Promise<Buffer> {
         const est: any = await this.estimateModel.findById(id).lean();
@@ -95,13 +117,17 @@ export class EstimatePdfService {
     }
 
     private render(def: TDocumentDefinitions): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
-            const pdfDoc = this.printer.createPdfKitDocument(def);
-            const chunks: Buffer[] = [];
-            pdfDoc.on('data', (c: Buffer) => chunks.push(c));
-            pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-            pdfDoc.on('error', reject);
-            pdfDoc.end();
+        return new Promise(async (resolve, reject) => {
+            try {
+                const pdfDoc = await this.printer.createPdfKitDocument(def);
+                const chunks: Buffer[] = [];
+                pdfDoc.on('data', (c: Buffer) => chunks.push(c));
+                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+                pdfDoc.on('error', reject);
+                pdfDoc.end();
+            } catch (e) {
+                reject(e);
+            }
         });
     }
 
