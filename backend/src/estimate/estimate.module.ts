@@ -6,6 +6,7 @@ import { NomenclatureItem, NomenclatureSchema } from '../nomenclature/schemas/no
 import { WorkStage, WorkStageSchema } from '../work-stages/schemas/work-stage.schema';
 import { MarkupSettings, MarkupSettingsSchema } from '../markup/schemas/markup-settings.schema';
 import { EstimateService } from './estimate.service';
+import { EstimatePdfService } from './estimate-pdf.service';
 import { EstimateController } from './estimate.controller';
 import { ProjectsModule } from '../projects/projects.module';
 
@@ -20,7 +21,7 @@ import { ProjectsModule } from '../projects/projects.module';
     ]),
     ProjectsModule,
   ],
-  providers: [EstimateService],
+  providers: [EstimateService, EstimatePdfService],
   controllers: [EstimateController],
   exports: [EstimateService],
 })

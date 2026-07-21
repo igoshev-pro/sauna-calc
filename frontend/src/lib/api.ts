@@ -190,6 +190,8 @@ export const estimatesApi = {
     api.put<Estimate>(`/estimates/${id}`, data),
   remove: (id: string) =>
     api.delete(`/estimates/${id}`),
+  downloadPdf: (id: string) =>
+    api.get(`/estimates/${id}/pdf`, { responseType: 'blob' }),
 };
 
 // ─── Пользователи ───────────────────────────────────────────

@@ -5,8 +5,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Ruler, Layers, Wind, Paintbrush, Hammer, FileText,
   ChevronLeft, ChevronRight, Calculator, Lock, RotateCcw,
-  ChevronDown, Package, Wrench, Info, Lightbulb, Save, Check,
+  ChevronDown, Package, Wrench, Info, Lightbulb, Save, Check, Printer,
 } from 'lucide-react';
+import { estimatesApi } from '@/lib/api';
 import { Header } from '@/components/ui/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -379,6 +380,7 @@ export default function TermosPage() {
               saveLoading={saveLoading}
               savedOk={savedOk}
               projectId={projectId}
+              estimateId={estimateId}
               onBackToProject={() =>
                 projectId && router.push(`/dashboard/projects/${projectId}`)
               }
@@ -418,7 +420,7 @@ type ResultTab = 'client' | 'purchase';
 function ResultView({
   result, loading, onCalc,
   estimateName, onNameChange, onSave, saveLoading, savedOk,
-  projectId, onBackToProject,
+  projectId, estimateId, onBackToProject,
 }: {
   result: ReturnType<typeof useTermosWizardStore.getState>['result'];
   loading: boolean;
@@ -429,9 +431,25 @@ function ResultView({
   saveLoading: boolean;
   savedOk: boolean;
   projectId: string | null;
+  estimateId: string | null;
   onBackToProject: () => void;
 }) {
   const [tab, setTab] = useState<ResultTab>('client');
+
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    if (!estimateId) return;
+    setPrinting(true);
+    try {
+      const { data } = await estimatesApi.downloadPdf(estimateId);
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   if (!result) {
     return (
@@ -495,6 +513,11 @@ function ResultView({
           {savedOk ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           {savedOk ? 'Сохранено' : 'Сохранить смету'}
         </Button>
+        {estimateId && (
+          <Button variant="secondary" onClick={handlePrint} loading={printing}>
+            <Printer className="w-4 h-4" /> Распечатать
+          </Button>
+        )}
         {projectId && savedOk && (
           <Button variant="secondary" onClick={onBackToProject}>
             К проекту
