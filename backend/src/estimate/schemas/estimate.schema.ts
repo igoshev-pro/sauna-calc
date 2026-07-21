@@ -159,6 +159,7 @@ class SaunaWallDim {
 }
 
 // Позиция этапа термоса в снапшоте сметы
+// Позиция этапа термоса в снапшоте сметы
 @Schema({ _id: false })
 class SaunaStage {
   @Prop({ type: Types.ObjectId, ref: 'WorkStage' })
@@ -169,6 +170,16 @@ class SaunaStage {
 
   @Prop({ default: 0 })
   laborTotal: number;
+
+  // 🆕 детализация работы
+  @Prop({ default: '' })
+  laborUnit: string;
+
+  @Prop({ default: 0 })
+  laborQty: number;
+
+  @Prop({ default: 0 })
+  laborPricePerUnit: number;
 
   @Prop({ type: [SaunaMaterial], default: [] })
   materials: SaunaMaterial[];

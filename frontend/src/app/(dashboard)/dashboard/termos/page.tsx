@@ -627,13 +627,22 @@ function StageAccordion({
       {/* Детализация */}
       {open && (
         <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3 flex flex-col gap-4">
-          {/* Работы — общей строкой */}
+          {/* Работы — с расшифровкой объёма */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Wrench className="w-3.5 h-3.5" /> Работы
             </p>
-            <div className="bg-white rounded border border-gray-200 px-4 py-2.5 flex justify-between text-sm">
-              <span className="text-gray-700">Работы по этапу «{cleanStageName(stage.name)}»</span>
+            <div className="bg-white rounded border border-gray-200 px-4 py-2.5 flex justify-between items-center text-sm">
+              <div className="flex flex-col">
+                <span className="text-gray-700">
+                  {cleanStageName(stage.name)}
+                </span>
+                {stage.laborQty ? (
+                  <span className="text-xs text-gray-400 mt-0.5">
+                    {fmt(stage.laborQty)} {stage.laborUnit} × {fmt(stage.laborPricePerUnit ?? 0)} ₽
+                  </span>
+                ) : null}
+              </div>
               <span className="font-medium text-gray-900">{fmt(stage.laborTotal)} ₽</span>
             </div>
           </div>
@@ -661,7 +670,14 @@ function StageAccordion({
                   <tbody className="divide-y divide-gray-50">
                     {stage.materials.map((m: PreviewMaterial, i: number) => (
                       <tr key={`${m.nomenclatureId}-${i}`}>
-                        <td className="px-4 py-2 text-gray-700">{m.name}</td>
+                        <td className="px-4 py-2 text-gray-700">
+                          <div className="flex flex-col">
+                            <span>{m.name}</span>
+                            {m.comment ? (
+                              <span className="text-xs text-gray-400 mt-0.5">{m.comment}</span>
+                            ) : null}
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-right text-gray-500">{fmt(m.needed)}</td>
                         <td className="px-3 py-2 text-right font-medium text-amber-700">{fmt(m.toOrder)}</td>
                         <td className="px-2 py-2 text-gray-400">{m.unit}</td>

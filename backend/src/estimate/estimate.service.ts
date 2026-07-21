@@ -401,6 +401,7 @@ export class EstimateService {
                         toOrder: q.toOrder,
                         pricePerUnit: price,
                         total,
+                        comment: it.comment ?? '',   // 🆕
                     };
                 });
 
@@ -417,6 +418,9 @@ export class EstimateService {
                     name: st.name,
                     sortOrder: st.sortOrder ?? 0,
                     laborTotal: stageLabor,
+                    laborUnit: st.laborUnit ?? '',                 // 🆕
+                    laborQty,                                       // 🆕
+                    laborPricePerUnit: st.laborPricePerUnit ?? 0,   // 🆕
                     materials,
                     materialsTotal: stageMatTotal,
                     total: stageTotal,

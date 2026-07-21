@@ -29,12 +29,16 @@ export interface PreviewMaterial {
   toOrder: number;
   pricePerUnit: number;
   total: number;
+  comment?: string;            // 🆕
 }
 
 export interface PreviewStage {
   stageId: string;
   name: string;
   laborTotal: number;
+  laborUnit?: string;          // 🆕
+  laborQty?: number;           // 🆕
+  laborPricePerUnit?: number;  // 🆕
   materials: PreviewMaterial[];
   materialsTotal: number;
   total: number;
