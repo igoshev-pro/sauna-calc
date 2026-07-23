@@ -149,23 +149,21 @@ export default function TermosPage() {
                 <p className="text-sm text-gray-500">Вводятся один раз, используются во всех расчётах.</p>
               </div>
 
-              <Input
+              <NumberInput
                 label="Высота потолка, м"
-                type="number" step="0.01" min="0"
-                value={measurements.height || ''}
-                onChange={(e) => setHeight(Number(e.target.value))}
+                value={measurements.height}
+                onChange={(v) => setHeight(v)}
               />
 
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Длина стен, м</p>
                 <div className="grid grid-cols-2 gap-3">
                   {measurements.walls.map((w: WallInput) => (
-                    <Input
+                    <NumberInput
                       key={w.name}
                       label={`Стена ${w.name}`}
-                      type="number" step="0.01" min="0"
-                      value={w.length || ''}
-                      onChange={(e) => setWall(w.name, Number(e.target.value))}
+                      value={w.length}
+                      onChange={(v) => setWall(w.name, v)}
                     />
                   ))}
                 </div>
@@ -174,17 +172,15 @@ export default function TermosPage() {
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Потолок, м</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input
+                  <NumberInput
                     label="Ширина"
-                    type="number" step="0.01" min="0"
-                    value={measurements.ceiling.width || ''}
-                    onChange={(e) => setCeiling('width', Number(e.target.value))}
+                    value={measurements.ceiling.width}
+                    onChange={(v) => setCeiling('width', v)}
                   />
-                  <Input
+                  <NumberInput
                     label="Длина"
-                    type="number" step="0.01" min="0"
-                    value={measurements.ceiling.length || ''}
-                    onChange={(e) => setCeiling('length', Number(e.target.value))}
+                    value={measurements.ceiling.length}
+                    onChange={(v) => setCeiling('length', v)}
                   />
                 </div>
               </div>
@@ -199,17 +195,15 @@ export default function TermosPage() {
                   {measurements.shelves.map((sh, i) => (
                     <div key={i} className="grid grid-cols-[80px_1fr_1fr] gap-3 items-end">
                       <span className="text-sm text-gray-600 pb-2.5">Полок {i + 1}</span>
-                      <Input
+                      <NumberInput
                         label="Ширина"
-                        type="number" step="0.01" min="0"
-                        value={sh.width || ''}
-                        onChange={(e) => setShelf(i, 'width', Number(e.target.value))}
+                        value={sh.width}
+                        onChange={(v) => setShelf(i, 'width', v)}
                       />
-                      <Input
+                      <NumberInput
                         label="Длина"
-                        type="number" step="0.01" min="0"
-                        value={sh.length || ''}
-                        onChange={(e) => setShelf(i, 'length', Number(e.target.value))}
+                        value={sh.length}
+                        onChange={(v) => setShelf(i, 'length', v)}
                       />
                     </div>
                   ))}
@@ -720,6 +714,51 @@ function StageAccordion({
 }
 
 // ─── Вспомогательные ─────────────────────────────────────────
+
+// ─── Числовой инпут с поддержкой ввода 0 и десятичной запятой/точки ─
+
+function NumberInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  // локальное строковое состояние — чтобы можно было печатать "0", "0,", "0.8"
+  const [text, setText] = useState<string>(
+    value === 0 ? '' : String(value),
+  );
+
+  // синхронизация при внешнем изменении (загрузка сметы, reset и т.д.)
+  useEffect(() => {
+    const currentNum = text.replace(',', '.') === '' ? 0 : Number(text.replace(',', '.'));
+    if (currentNum !== value) {
+      setText(value === 0 ? '' : String(value));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const handleChange = (raw: string) => {
+    // разрешаем только цифры, запятую и точку
+    const cleaned = raw.replace(/[^0-9.,]/g, '');
+    setText(cleaned);
+    const normalized = cleaned.replace(',', '.');
+    const num = normalized === '' || normalized === '.' ? 0 : Number(normalized);
+    if (!Number.isNaN(num)) onChange(num);
+  };
+
+  return (
+    <Input
+      label={label}
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={(e) => handleChange(e.target.value)}
+    />
+  );
+}
 
 function TabBtn({
   active, onClick, children,
